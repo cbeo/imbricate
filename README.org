@@ -42,7 +42,7 @@
 :   (:NAME "AcidArrow" :X 0 :Y 90 :PATH
 :    #P"/tmp/eg/AcidArrow.png" :WIDTH 30 :HEIGHT 30)) 
 
-The =example-graphics.bat.txt= is a file that lists the any images that the
+The =example-graphics.bad.txt= is a file that lists the any images that the
 script could not decode as =png= files. Any such files are skipped.
 
 ** Building
@@ -52,7 +52,7 @@ Assuming that you have [[https://github.com/roswell/roswell][roswell]] installed
 : $ ros use sbcl 
 : $ git clone https://github.com/thegoofist/imbricate.git 
 : $ cd imbricate.git
-: $ ros build imbricate.git
+: $ ros build imbricate.ros
 
 
 
