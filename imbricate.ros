@@ -134,7 +134,7 @@ exec ros -Q -- $0 "$@"
                      (when (unfilled-over-rect grid x y width height)
                        (return-from search-loop (list x y)))))
                (progn
-                 (adjust-array grid (list (* 2 gw) (* 2 gh)) :initial-element nil)
+                 (adjust-array grid (list (+ width gw) (+ height gh)) :initial-element nil)
                  (search-loop)))))
     (search-loop)))
 
@@ -147,6 +147,7 @@ exec ros -Q -- $0 "$@"
              (tilesheet (pack-images packlist))
              (tile-index (packlist->tile-index packlist)))
         (imago:write-png tilesheet (format nil "~a.png" target))
-        (write-tile-index tile-index (format nil "~a-index.lisp" target))))
+        (write-tile-index tile-index (format nil "~a-index.lisp" target))
+        (write-tile-index *bad-images* (format nil "~a.bad.txt" target))))
   (format t "ALL DONE~%"))
 ;;; vim: set ft=lisp lisp:
