@@ -1,0 +1,140 @@
+;; #!/bin/sh
+;; #|-*- mode:lisp -*-|#
+;; #|
+;; exec ros -Q -- $0 "$@"
+;; |#
+;; (progn ;;init forms
+;;   (ros:ensure-asdf)
+;;   #+quicklisp(ql:quickload '(imago cl-fad) :silent t)
+;;   )
+
+(defpackage :ros.script.imbricate.3764151058
+  (:use :cl))
+(in-package :ros.script.imbricate.3764151058)
+
+(defmacro let-when ((var test) &rest body)
+  `(let ((,var ,test))
+     (when ,var ,@body)))
+
+(defun images-under-dir (dir &key (type "png"))
+  (let ((images '()))
+    (cl-fad:walk-directory
+     dir
+     (lambda (path)
+       (let-when (img (and (string= type (pathname-type path))
+                           (safe-open-image path)))
+                 (push (nconc (list :path path) (image-stats img)) images))))
+    images))
+
+(defvar *bad-images* '())
+
+
+(defun safe-open-image (path)
+  (handler-case (imago:read-image (format nil "~a" path))
+    (error (c)
+      (push path *bad-images*)
+      nil)))
+
+(defun image-stats (img)
+    (list :width (imago:image-width img)
+          :height (imago:image-height img)))
+
+(defun image-area (stat)
+  (* (getf stat :width)
+     (getf stat :height)))
+
+(defun minimum-required-area (image-list)
+  (loop for stats in image-list
+        summing (image-area stats)))
+
+(defun packlist-dimensions (packlist)
+  (let ((w 0) (h 0))
+    (dolist (img packlist)
+      (setf w (max w (+ (getf img :width) (getf img :x))))
+      (setf h (max h (+ (getf img :height) (getf img :y)))))
+    (list w h)))
+
+(defun fill-grid (grid x y w h)
+  "fills grid with T for rectangle x y w h"
+  (do-over-rect x y w h #'(lambda (xi yi) (setf (aref grid xi yi) t))))
+
+(defun pack-images (packlist)
+  "Creates an image and copies the contents of the packlist to that image"
+  (destructuring-bind (cw ch) (packlist-dimensions packlist)
+    (let ((tilesheet (make-instance 'imago:rgb-image :width cw :height ch)))
+      (dolist (spec packlist)
+        (let-when (img (safe-open-image (getf spec :path)))
+                  (imago:copy tilesheet img
+                              :dest-x (getf spec :x)
+                              :dest-y (getf spec :y))))
+      tilesheet)))
+
+(defun packlist->tile-index (packlist)
+  "renames the path1 in the packlist to a nicer name for referring toa tile location"
+  (mapcar #'(lambda (pl)
+              (let ((name (pathname-name (getf pl :path))))
+                (remf pl :path)
+                (setf (getf pl :name) name)
+                pl))
+          packlist))
+
+
+(defun write-tile-index (tile-index file-path)
+  "saves tile-index to file-path as a standard lisp object"
+  (with-open-file (out file-path :direction :output)
+    (print tile-index out)))
+
+
+(defun build-packlist (image-list)
+  (let* ((image-list (sort image-list #'> :key #'image-area))
+         (side-dim (ceiling (sqrt (minimum-required-area image-list))))
+         (pack-mask (make-array (list side-dim side-dim) :initial-element nil :adjustable t))
+         (pack-list '()))
+    (dolist (image image-list)
+      (let ((width (getf image :width))
+            (height (getf image :height)))
+        (destructuring-bind (x y) (find-place-for pack-mask width height)
+          (fill-grid pack-mask x y width height)
+          (push (nconc (list :x x :y y) image) pack-list))))
+    (reverse pack-list))) ;; biggest image first
+
+
+(defun do-over-rect (x y w h fn)
+  (loop for xi from x to (+ x w -1) do
+    (loop for yi from y to (+ y h -1) do
+      (funcall fn xi yi))))
+
+
+(defun filled-at (grid x y)
+  "returns two values. The the second is nil if x y is out of range"
+  (destructuring-bind (gw gh) (array-dimensions grid)
+    (if (and (< x gw) (< y gh))
+        (values (aref grid x y) t)
+        (values nil nil))))
+
+(defun unfilled-over-rect (grid x y w h)
+  (do-over-rect x y w h
+    #'(lambda (xi yi)
+        (multiple-value-bind (filled in-bounds) (filled-at grid xi yi)
+          (when (or filled (not in-bounds))
+            (return-from unfilled-over-rect nil)))))
+  t)
+
+(defun find-place-for (grid width height)
+  "returns (x y) where a (width X height) sized rectangle will fit into grid"
+  (labels ((search-loop ()
+             (destructuring-bind (gw gh) (array-dimensions grid)
+               (do-over-rect 0 0 gw gh
+                 #'(lambda (x y)
+                     (when (unfilled-over-rect grid x y width height)
+                       (return-from search-loop (list x y)))))
+               (progn
+                 (adjust-array grid (list (* 2 gw) (* 2 gh)) :initial-element nil)
+                 (search-loop)))))
+    (search-loop)))
+
+
+
+(defun main (&rest argv)
+  (declare (ignorable argv)))
+;;; vim: set ft=lisp lisp:
