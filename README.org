@@ -1,0 +1,61 @@
+
+* =imbricate= makes tilesheets for (Lisp) games
+
+  The =imbricate= turns a directory, with possible nexted directories,
+  containing images of varying sizes into a single tile sheet. The tool also
+  produces file containing a list of property lists that includes a location and
+  a name for each image within the sheet.
+
+** Example
+
+
+:  $ ls eg/
+:  AcidArrow.png  AcidPellet.png  Acorn.png        Amber.png     AncientSpear.png  Arrow.png
+:  AcidBolt.png   AcidSac.png     AdamantBone.png  Amythyst.png  Apple.png         AstralCloak.png
+:  
+:  $ imbricate eg/ example-graphics
+:  ALL DONE!
+:  
+:  $ ls example-graphics*
+:  example-graphics.bad.txt  example-graphics-index.lisp  example-graphics.png
+:  
+:  $ cat example-graphics-index.lisp
+:  
+:  ((:NAME "AstralCloak" :X 0 :Y 0 :PATH
+:    #P"/tmp/eg/AstralCloak.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "Arrow" :X 0 :Y 30 :PATH
+:    #P"/tmp/eg/Arrow.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "Apple" :X 0 :Y 60 :PATH
+:    #P"/tmp/eg/Apple.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "AncientSpear" :X 30 :Y 0 :PATH
+:    #P"/tmp/eg/AncientSpear.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "Amythyst" :X 30 :Y 30 :PATH
+:    #P"/tmp/eg/Amythyst.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "Amber" :X 30 :Y 60 :PATH
+:    #P"/tmp/eg/Amber.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "AdamantBone" :X 60 :Y 0 :PATH
+:    #P"/tmp/eg/AdamantBone.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "Acorn" :X 60 :Y 30 :PATH
+:    #P"/tmp/eg/Acorn.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "AcidSac" :X 60 :Y 60 :PATH
+:    #P"/tmp/eg/AcidSac.png" :WIDTH 30 :HEIGHT 30)
+:   (:NAME "AcidArrow" :X 0 :Y 90 :PATH
+:    #P"/tmp/eg/AcidArrow.png" :WIDTH 30 :HEIGHT 30)) 
+
+The =example-graphics.bat.txt= is a file that lists the any images that the
+script could not decode as =png= files. Any such files are skipped.
+
+** Building
+
+Assuming that you have [[https://github.com/roswell/roswell][roswell]] installed:
+
+: $ ros use sbcl 
+: $ git clone https://github.com/thegoofist/imbricate.git 
+: $ cd imbricate.git
+: $ ros build imbricate.git
+
+
+
+
+
+  
