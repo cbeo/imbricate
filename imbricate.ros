@@ -58,15 +58,20 @@ exec ros -Q -- $0 "$@"
   "fills grid with T for rectangle x y w h"
   (do-over-rect x y w h #'(lambda (xi yi) (setf (aref grid xi yi) t))))
 
+(defun rgb-imagep (img)
+  (eq (find-class 'imago:rgb-image)
+      (class-of img)))
+
 (defun pack-images (packlist)
   "Creates an image and copies the contents of the packlist to that image"
   (destructuring-bind (cw ch) (packlist-dimensions packlist)
     (let ((tilesheet (make-instance 'imago:rgb-image :width cw :height ch)))
       (dolist (spec packlist)
         (let-when (img (safe-open-image (getf spec :path)))
-                  (imago:copy tilesheet img
+                  (let ((img (if (not (rgb-imagep img)) (imago:convert-to-rgb img) img)))
+                    (imago:copy tilesheet img
                               :dest-x (getf spec :x)
-                              :dest-y (getf spec :y))))
+                              :dest-y (getf spec :y)))))
       tilesheet)))
 
 (defun packlist->tile-index (packlist)
@@ -132,7 +137,6 @@ exec ros -Q -- $0 "$@"
                  (adjust-array grid (list (* 2 gw) (* 2 gh)) :initial-element nil)
                  (search-loop)))))
     (search-loop)))
-
 
 
 (defun main (&rest argv)
