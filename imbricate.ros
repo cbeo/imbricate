@@ -78,7 +78,6 @@ exec ros -Q -- $0 "$@"
   "renames the path1 in the packlist to a nicer name for referring toa tile location"
   (mapcar #'(lambda (pl)
               (let ((name (pathname-name (getf pl :path))))
-                (remf pl :path)
                 (setf (getf pl :name) name)
                 pl))
           packlist))
