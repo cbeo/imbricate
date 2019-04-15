@@ -1,12 +1,12 @@
-;; #!/bin/sh
-;; #|-*- mode:lisp -*-|#
-;; #|
-;; exec ros -Q -- $0 "$@"
-;; |#
-;; (progn ;;init forms
-;;   (ros:ensure-asdf)
-;;   #+quicklisp(ql:quickload '(imago cl-fad) :silent t)
-;;   )
+#!/bin/sh
+#|-*- mode:lisp -*-|#
+#|
+exec ros -Q -- $0 "$@"
+|#
+(progn ;;init forms
+  (ros:ensure-asdf)
+  #+quicklisp(ql:quickload '(imago cl-fad) :silent t)
+  )
 
 (defpackage :ros.script.imbricate.3764151058
   (:use :cl))
@@ -136,5 +136,13 @@
 
 
 (defun main (&rest argv)
-  (declare (ignorable argv)))
+  (declare (ignorable argv))
+  (destructuring-bind (path target) argv
+      (let* ((tile-stats (images-under-dir path))
+             (packlist (build-packlist tile-stats))
+             (tilesheet (pack-images packlist))
+             (tile-index (packlist->tile-index packlist)))
+        (imago:write-png tilesheet (format nil "~a.png" target))
+        (write-tile-index tile-index (format nil "~a-index.lisp" target))))
+  (format t "ALL DONE~%"))
 ;;; vim: set ft=lisp lisp:
