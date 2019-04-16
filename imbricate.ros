@@ -20,6 +20,14 @@ exec ros -Q -- $0 "$@"
   `(let ((,var ,test))
      (if ,var ,then ,else)))
 
+
+(defmacro match-dolist ((matchform form) &rest body)
+  (if (listp matchform)
+      (let ((tmpvar (gensym)))
+        `(dolist (,tmpvar ,form)
+           (destructuring-bind ,matchform ,tmpvar ,@body)))
+      `(dolist (,matchform ,form) ,@body)))
+
 (defun images-under-dir (dir &key (type "png"))
   (let ((images '()))
     (cl-fad:walk-directory
@@ -109,13 +117,29 @@ exec ros -Q -- $0 "$@"
         (ry r) (+ (ry r) (rh r))))
 
 
-(defun inside-rect (r x y)
+(defun inside-rect (r xy)
   (destructuring-bind (l r tp b) (xy-bounds r)
-    (and (<= l x) (< x r)
-         (<= tp y) (< y b))))
+    (destructuring-bind (x y) xy
+      (and (< l x) (< x r)
+           (< tp y) (< y b)))))
+
+(defun intersect-p (r1 r2)
+  (or
+   (equalp r1 r2)
+   (inside-rect r1 (tl r2))
+   (inside-rect r1 (tr r2))
+   (inside-rect r1 (br r2))
+   (inside-rect r1 (bl r2))
+   (inside-rect r2 (tl r1))
+   (inside-rect r2 (tr r1))
+   (inside-rect r2 (br r1))
+   (inside-rect r2 (bl r1))
+   )) ;; TODO add the case checks for edge intersections 
 
 
-(defun make-corner-keeper () (list 0 0 '() (make-hash-table :test 'equal)))
+
+
+(defun make-corner-keeper () (list 0 0 '() (make-hash-table :test 'equal) '()))
 (defun keeper-w (k) (first k))
 (defun keeper-h (k) (second k))
 (defun (setf keeper-w) (v k)
@@ -135,62 +159,50 @@ exec ros -Q -- $0 "$@"
 (defun visit (k p)
   (setf (gethash p (visited-corners k)) t))
 
+(defun keeper-rects (k) (fifth k))
+(defun (setf keeper-rects) (val k)
+  (setf (fifth k) val))
+
 (defun remove-corner (k c)
   (setf (keeper-corners k)
         (remove c (keeper-corners k) :test #'equal)))
 
-(defun prune-corners-behind (k r)
-  (setf (keeper-corners k)
-        (remove-if
-         #'(lambda (xy)
-             (destructuring-bind (x y) xy
-               (or
-                (inside-rect r x y)
-                (inside-rect r (+ x (rw r) -1) (+ y (rh r) -1))
-                (inside-rect r (+ x (rw r) -1) y)
-                (inside-rect r x (+ y (rh r) -1)))))
-
-         (keeper-corners k))))
 
 (defun add-corner (k c)
   (unless (was-visited k c)
     (visit k c)
     (push c (keeper-corners k))))
 
-(defun adjust-width (k)
-  (let ((mx 0)
-        (my 0))
-    (dolist (xy (keeper-corners k))
-      (setf mx (max mx (first xy)))
-      (setf my (max my (second xy))))
-    (setf (keeper-w k) mx)
-    (setf (keeper-h k) my)))
-
 (defun add-rect (k r)
   (remove-corner k (tl r))
-  (prune-corners-behind k r)
+  (push r (keeper-rects k))
   (add-corner k (tr r))
   (add-corner k (bl r))
-  (add-corner k (br r))
-  (adjust-width k))
+;;  (add-corner k (br r))
+  (setf (keeper-w k) (max (first (br r))
+                          (keeper-w k)))
+  (setf (keeper-h k) (max (second (br r))
+                          (keeper-h k))))
 
 
-(defun bounds-preserving-corners (k w h)
-  (let ((kw (keeper-w k))
-        (kh (keeper-h k)))
-    (remove-if
-     #'(lambda (xy)
-         (destructuring-bind (x y) xy
-           (or (< kw (+ x w))
-               (< kh (+ y h)))))
-     (keeper-corners k))))
+(defun intersects-any-tile-p (k r)
+  (dolist (r2 (keeper-rects k))
+    (when (intersect-p r r2)
+      (return-from intersects-any-tile-p t))))
+
+(defun valid-rect (k r)
+  (and (inside-rect (rect 0 0 (keeper-w k) (keeper-h k)) (br r))
+       (not (intersects-any-tile-p k r))))
 
 (defun find-space-for (k w h)
-  (let-if (candidates (bounds-preserving-corners k w h))
-          (first candidates)
-          (if (< (keeper-w k) (keeper-h k))
-              (list (keeper-w k) 0)
-              (list 0 (keeper-h k)))))
+  (dolist (xy (keeper-corners k))
+    (when (valid-rect k (rect (first xy) (second xy) w h))
+      (return-from find-space-for xy)))
+  ;; if not already-returned, then do:
+  (if (< (keeper-w k) (keeper-h k))
+      (list (keeper-w k) 0)
+      (list 0 (keeper-h k))))
+
 
 (defun build-packlist (tile-stats)
   (let ((tile-stats (sort tile-stats #'> :key #'image-area))
@@ -200,6 +212,7 @@ exec ros -Q -- $0 "$@"
       (let ((tw (getf stats :width))
             (th (getf stats :height)))
         (destructuring-bind (x y) (find-space-for ck tw th)
+          (format t "found space: ~a,~a~%" x y)
           (add-rect ck (rect x y tw th))
           (push (nconc (list :x x :y y) stats) packlist))))
     packlist))
