@@ -134,9 +134,15 @@ exec ros -Q -- $0 "$@"
    (inside-rect r2 (tr r1))
    (inside-rect r2 (br r1))
    (inside-rect r2 (bl r1))
-   )) ;; TODO add the case checks for edge intersections 
-
-
+   ;; if no corner of one is inside the other, then
+   ;; any edge of one intersects at least one edge of the other
+   ;; so we check one arbitrarily
+   (destructuring-bind (left1 right1 top1 bottom1) (xy-bounds r1)
+     (destructuring-bind (left2 right2 top2 bottom2) (xy-bounds r2)
+       (and (<= left1 left2)
+            (< left2 right1)
+            (<= top2 top1)
+            (< top1 bottom2))))))
 
 
 (defun make-corner-keeper () (list 0 0 '() (make-hash-table :test 'equal) '()))
@@ -212,7 +218,6 @@ exec ros -Q -- $0 "$@"
       (let ((tw (getf stats :width))
             (th (getf stats :height)))
         (destructuring-bind (x y) (find-space-for ck tw th)
-          (format t "found space: ~a,~a~%" x y)
           (add-rect ck (rect x y tw th))
           (push (nconc (list :x x :y y) stats) packlist))))
     packlist))
