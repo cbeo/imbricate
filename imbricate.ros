@@ -29,10 +29,13 @@ exec ros -Q -- $0 "$@"
       `(dolist (,matchform ,form) ,@body)))
 
 (defun images-under-dir (dir &key (type "png"))
+  (format t "~%Reading images from disk")
   (let ((images '()))
     (cl-fad:walk-directory
      dir
      (lambda (path)
+       (format t ".")
+       (force-output)
        (let-when (img (and (string= type (pathname-type path))
                            (safe-open-image path)))
                  (push (nconc (list :path path) (image-stats img)) images))))
@@ -77,9 +80,12 @@ exec ros -Q -- $0 "$@"
 
 (defun pack-images (packlist)
   "Creates an image and copies the contents of the packlist to that image"
+  (format t "~%Constructing tilesheet")
   (destructuring-bind (cw ch) (packlist-dimensions packlist)
     (let ((tilesheet (make-instance 'imago:rgb-image :width cw :height ch)))
       (dolist (spec packlist)
+        (format t ".")
+        (force-output)
         (let* ((img (to-rgb (getf spec :img))))
           (imago:copy tilesheet img
                       :dest-x (getf spec :x)
@@ -211,6 +217,7 @@ exec ros -Q -- $0 "$@"
 
 
 (defun build-packlist (tile-stats)
+  (format t "~%Creating Layout")
   (let ((tile-stats (sort tile-stats #'> :key #'image-area))
         (ck (make-corner-keeper))
         (packlist '()))
@@ -218,6 +225,8 @@ exec ros -Q -- $0 "$@"
       (let ((tw (getf stats :width))
             (th (getf stats :height)))
         (destructuring-bind (x y) (find-space-for ck tw th)
+          (format t ".")
+          (force-output)
           (add-rect ck (rect x y tw th))
           (push (nconc (list :x x :y y) stats) packlist))))
     packlist))
@@ -230,8 +239,10 @@ exec ros -Q -- $0 "$@"
              (packlist (build-packlist tile-stats))
              (tilesheet (pack-images packlist))
              (tile-index (packlist->tile-index packlist)))
+        (format t "~%Writing to disk...")
+        (force-output)
         (imago:write-png tilesheet (format nil "~a.png" target))
         (write-tile-index tile-index (format nil "~a-index.lisp" target))
         (write-tile-index *bad-images* (format nil "~a.bad.txt" target))))
-  (format t "ALL DONE~%"))
+  (format t "~%ALL DONE~%"))
 ;;; vim: set ft=lisp lisp:
