@@ -16,6 +16,10 @@ exec ros -Q -- $0 "$@"
   `(let ((,var ,test))
      (when ,var ,@body)))
 
+(defmacro let-if ((var test) then else)
+  `(let ((,var ,test))
+     (if ,var ,then ,else)))
+
 (defun images-under-dir (dir &key (type "png"))
   (let ((images '()))
     (cl-fad:walk-directory
@@ -28,7 +32,6 @@ exec ros -Q -- $0 "$@"
 
 (defvar *bad-images* '())
 
-
 (defun safe-open-image (path)
   (handler-case (imago:read-image (format nil "~a" path))
     (error (c)
@@ -37,7 +40,8 @@ exec ros -Q -- $0 "$@"
 
 (defun image-stats (img)
     (list :width (imago:image-width img)
-          :height (imago:image-height img)))
+          :height (imago:image-height img)
+          :img img))
 
 (defun image-area (stat)
   (* (getf stat :width)
@@ -54,30 +58,31 @@ exec ros -Q -- $0 "$@"
       (setf h (max h (+ (getf img :height) (getf img :y)))))
     (list w h)))
 
-(defun fill-grid (grid x y w h)
-  "fills grid with T for rectangle x y w h"
-  (do-over-rect x y w h #'(lambda (xi yi) (setf (aref grid xi yi) t))))
-
 (defun rgb-imagep (img)
   (eq (find-class 'imago:rgb-image)
       (class-of img)))
+
+(defun to-rgb (img)
+  (if (not (rgb-imagep img))
+      (imago:convert-to-rgb img)
+      img))
 
 (defun pack-images (packlist)
   "Creates an image and copies the contents of the packlist to that image"
   (destructuring-bind (cw ch) (packlist-dimensions packlist)
     (let ((tilesheet (make-instance 'imago:rgb-image :width cw :height ch)))
       (dolist (spec packlist)
-        (let-when (img (safe-open-image (getf spec :path)))
-                  (let ((img (if (not (rgb-imagep img)) (imago:convert-to-rgb img) img)))
-                    (imago:copy tilesheet img
-                              :dest-x (getf spec :x)
-                              :dest-y (getf spec :y)))))
+        (let* ((img (to-rgb (getf spec :img))))
+          (imago:copy tilesheet img
+                      :dest-x (getf spec :x)
+                      :dest-y (getf spec :y))))
       tilesheet)))
 
 (defun packlist->tile-index (packlist)
   "renames the path1 in the packlist to a nicer name for referring toa tile location"
   (mapcar #'(lambda (pl)
               (let ((name (pathname-name (getf pl :path))))
+                (remf pl :img)
                 (setf (getf pl :name) name)
                 pl))
           packlist))
@@ -89,53 +94,115 @@ exec ros -Q -- $0 "$@"
     (print tile-index out)))
 
 
-(defun build-packlist (image-list)
-  (let* ((image-list (sort image-list #'> :key #'image-area))
-         (side-dim (ceiling (sqrt (minimum-required-area image-list))))
-         (pack-mask (make-array (list side-dim side-dim) :initial-element nil :adjustable t))
-         (pack-list '()))
-    (dolist (image image-list)
-      (let ((width (getf image :width))
-            (height (getf image :height)))
-        (destructuring-bind (x y) (find-place-for pack-mask width height)
-          (fill-grid pack-mask x y width height)
-          (push (nconc (list :x x :y y) image) pack-list))))
-    (reverse pack-list))) ;; biggest image first
+(defun rect (x y w h) (list x y w h))
+(defun rx (r) (first r))
+(defun ry (r) (second r))
+(defun rw (r) (third r))
+(defun rh (r) (fourth r))
+(defun tl (r) (list (rx r) (ry r)))
+(defun tr (r) (list (+ (rx r) (rw r)) (ry r)))
+(defun br (r) (list (+ (rx r) (rw r)) (+ (ry r) (rh r))))
+(defun bl (r) (list (rx r) (+ (ry r) (rh r))))
+(defun xy-bounds (r)
+  "returns (left right top bottom)"
+  (list (rx r) (+ (rx r) (rw r))
+        (ry r) (+ (ry r) (rh r))))
 
 
-(defun do-over-rect (x y w h fn)
-  (loop for xi from x to (+ x w -1) do
-    (loop for yi from y to (+ y h -1) do
-      (funcall fn xi yi))))
+(defun inside-rect (r x y)
+  (destructuring-bind (l r tp b) (xy-bounds r)
+    (and (<= l x) (< x r)
+         (<= tp y) (< y b))))
 
 
-(defun filled-at (grid x y)
-  "returns two values. The the second is nil if x y is out of range"
-  (destructuring-bind (gw gh) (array-dimensions grid)
-    (if (and (< x gw) (< y gh))
-        (values (aref grid x y) t)
-        (values nil nil))))
+(defun make-corner-keeper () (list 0 0 '() (make-hash-table :test 'equal)))
+(defun keeper-w (k) (first k))
+(defun keeper-h (k) (second k))
+(defun (setf keeper-w) (v k)
+  (setf (first k) v))
+(defun (setf keeper-h) (v k)
+  (setf (second k) v))
 
-(defun unfilled-over-rect (grid x y w h)
-  (do-over-rect x y w h
-    #'(lambda (xi yi)
-        (multiple-value-bind (filled in-bounds) (filled-at grid xi yi)
-          (when (or filled (not in-bounds))
-            (return-from unfilled-over-rect nil)))))
-  t)
+(defun keeper-corners (k) (third k))
+(defun (setf keeper-corners) (val k)
+  (setf (third k) val))
 
-(defun find-place-for (grid width height)
-  "returns (x y) where a (width X height) sized rectangle will fit into grid"
-  (labels ((search-loop ()
-             (destructuring-bind (gw gh) (array-dimensions grid)
-               (do-over-rect 0 0 gw gh
-                 #'(lambda (x y)
-                     (when (unfilled-over-rect grid x y width height)
-                       (return-from search-loop (list x y)))))
-               (progn
-                 (adjust-array grid (list (+ width gw) (+ height gh)) :initial-element nil)
-                 (search-loop)))))
-    (search-loop)))
+(defun visited-corners (k) (fourth k))
+
+(defun was-visited (k p)
+  (gethash p (visited-corners k)))
+
+(defun visit (k p)
+  (setf (gethash p (visited-corners k)) t))
+
+(defun remove-corner (k c)
+  (setf (keeper-corners k)
+        (remove c (keeper-corners k) :test #'equal)))
+
+(defun prune-corners-behind (k r)
+  (setf (keeper-corners k)
+        (remove-if
+         #'(lambda (xy)
+             (destructuring-bind (x y) xy
+               (or
+                (inside-rect r x y)
+                (inside-rect r (+ x (rw r) -1) (+ y (rh r) -1))
+                (inside-rect r (+ x (rw r) -1) y)
+                (inside-rect r x (+ y (rh r) -1)))))
+
+         (keeper-corners k))))
+
+(defun add-corner (k c)
+  (unless (was-visited k c)
+    (visit k c)
+    (push c (keeper-corners k))))
+
+(defun adjust-width (k)
+  (let ((mx 0)
+        (my 0))
+    (dolist (xy (keeper-corners k))
+      (setf mx (max mx (first xy)))
+      (setf my (max my (second xy))))
+    (setf (keeper-w k) mx)
+    (setf (keeper-h k) my)))
+
+(defun add-rect (k r)
+  (remove-corner k (tl r))
+  (prune-corners-behind k r)
+  (add-corner k (tr r))
+  (add-corner k (bl r))
+  (add-corner k (br r))
+  (adjust-width k))
+
+
+(defun bounds-preserving-corners (k w h)
+  (let ((kw (keeper-w k))
+        (kh (keeper-h k)))
+    (remove-if
+     #'(lambda (xy)
+         (destructuring-bind (x y) xy
+           (or (< kw (+ x w))
+               (< kh (+ y h)))))
+     (keeper-corners k))))
+
+(defun find-space-for (k w h)
+  (let-if (candidates (bounds-preserving-corners k w h))
+          (first candidates)
+          (if (< (keeper-w k) (keeper-h k))
+              (list (keeper-w k) 0)
+              (list 0 (keeper-h k)))))
+
+(defun build-packlist (tile-stats)
+  (let ((tile-stats (sort tile-stats #'> :key #'image-area))
+        (ck (make-corner-keeper))
+        (packlist '()))
+    (dolist (stats tile-stats)
+      (let ((tw (getf stats :width))
+            (th (getf stats :height)))
+        (destructuring-bind (x y) (find-space-for ck tw th)
+          (add-rect ck (rect x y tw th))
+          (push (nconc (list :x x :y y) stats) packlist))))
+    packlist))
 
 
 (defun main (&rest argv)
