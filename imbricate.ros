@@ -16,18 +16,6 @@ exec ros -Q -- $0 "$@"
   `(let ((,var ,test))
      (when ,var ,@body)))
 
-(defmacro let-if ((var test) then else)
-  `(let ((,var ,test))
-     (if ,var ,then ,else)))
-
-
-(defmacro match-dolist ((matchform form) &rest body)
-  (if (listp matchform)
-      (let ((tmpvar (gensym)))
-        `(dolist (,tmpvar ,form)
-           (destructuring-bind ,matchform ,tmpvar ,@body)))
-      `(dolist (,matchform ,form) ,@body)))
-
 (defun images-under-dir (dir &key (type "png"))
   (format t "~%Reading images from disk")
   (let ((images '()))
@@ -101,12 +89,10 @@ exec ros -Q -- $0 "$@"
                 pl))
           packlist))
 
-
 (defun write-tile-index (tile-index file-path)
   "saves tile-index to file-path as a standard lisp object"
   (with-open-file (out file-path :direction :output)
     (print tile-index out)))
-
 
 (defun rect (x y w h) (list x y w h))
 (defun rx (r) (first r))
@@ -117,11 +103,11 @@ exec ros -Q -- $0 "$@"
 (defun tr (r) (list (+ (rx r) (rw r)) (ry r)))
 (defun br (r) (list (+ (rx r) (rw r)) (+ (ry r) (rh r))))
 (defun bl (r) (list (rx r) (+ (ry r) (rh r))))
+
 (defun xy-bounds (r)
   "returns (left right top bottom)"
   (list (rx r) (+ (rx r) (rw r))
         (ry r) (+ (ry r) (rh r))))
-
 
 (defun inside-rect (r xy)
   (destructuring-bind (l r tp b) (xy-bounds r)
@@ -149,7 +135,6 @@ exec ros -Q -- $0 "$@"
             (< left2 right1)
             (<= top2 top1)
             (< top1 bottom2))))))
-
 
 (defun make-corner-keeper () (list 0 0 '() (make-hash-table :test 'equal) '()))
 (defun keeper-w (k) (first k))
@@ -179,7 +164,6 @@ exec ros -Q -- $0 "$@"
   (setf (keeper-corners k)
         (remove c (keeper-corners k) :test #'equal)))
 
-
 (defun add-corner (k c)
   (unless (was-visited k c)
     (visit k c)
@@ -190,12 +174,10 @@ exec ros -Q -- $0 "$@"
   (push r (keeper-rects k))
   (add-corner k (tr r))
   (add-corner k (bl r))
-;;  (add-corner k (br r))
   (setf (keeper-w k) (max (first (br r))
                           (keeper-w k)))
   (setf (keeper-h k) (max (second (br r))
                           (keeper-h k))))
-
 
 (defun intersects-any-tile-p (k r)
   (dolist (r2 (keeper-rects k))
@@ -215,7 +197,6 @@ exec ros -Q -- $0 "$@"
       (list (keeper-w k) 0)
       (list 0 (keeper-h k))))
 
-
 (defun build-packlist (tile-stats)
   (format t "~%Creating Layout")
   (let ((tile-stats (sort tile-stats #'> :key #'image-area))
@@ -230,7 +211,6 @@ exec ros -Q -- $0 "$@"
           (add-rect ck (rect x y tw th))
           (push (nconc (list :x x :y y) stats) packlist))))
     packlist))
-
 
 (defun main (&rest argv)
   (declare (ignorable argv))
