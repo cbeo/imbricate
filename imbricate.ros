@@ -32,7 +32,7 @@ exec ros -Q -- $0 "$@"
 (defvar *bad-images* '())
 
 (defun safe-open-image (path)
-  (handler-case (imago:read-image (format nil "~a" path))
+  (handler-case (imago:read-png (format nil "~a" path))
     (error (c)
       (push path *bad-images*)
       nil)))
