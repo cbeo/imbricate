@@ -6,44 +6,169 @@
   produces file containing a list of property lists that includes a location and
   a name for each image within the sheet.
 
+  The property list outputs either a list of plists, or a json file.
+
 ** Example
 
+*** Running =imbricate=
 
-:  $ ls eg/
-:  AcidArrow.png  AcidPellet.png  Acorn.png        Amber.png     AncientSpear.png  Arrow.png
-:  AcidBolt.png   AcidSac.png     AdamantBone.png  Amythyst.png  Apple.png         AstralCloak.png
-:  
-:  $ imbricate eg/ example-graphics
-:  ALL DONE!
-:  
-:  $ ls example-graphics*
-:  example-graphics.bad.txt  example-graphics-index.lisp  example-graphics.png
-:  
-:  $ cat example-graphics-index.lisp
-:  
-:  ((:NAME "AstralCloak" :X 0 :Y 0 :PATH
-:    #P"/tmp/eg/AstralCloak.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "Arrow" :X 0 :Y 30 :PATH
-:    #P"/tmp/eg/Arrow.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "Apple" :X 0 :Y 60 :PATH
-:    #P"/tmp/eg/Apple.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "AncientSpear" :X 30 :Y 0 :PATH
-:    #P"/tmp/eg/AncientSpear.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "Amythyst" :X 30 :Y 30 :PATH
-:    #P"/tmp/eg/Amythyst.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "Amber" :X 30 :Y 60 :PATH
-:    #P"/tmp/eg/Amber.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "AdamantBone" :X 60 :Y 0 :PATH
-:    #P"/tmp/eg/AdamantBone.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "Acorn" :X 60 :Y 30 :PATH
-:    #P"/tmp/eg/Acorn.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "AcidSac" :X 60 :Y 60 :PATH
-:    #P"/tmp/eg/AcidSac.png" :WIDTH 30 :HEIGHT 30)
-:   (:NAME "AcidArrow" :X 0 :Y 90 :PATH
-:    #P"/tmp/eg/AcidArrow.png" :WIDTH 30 :HEIGHT 30)) 
+ Suppose you have a bunch of separate directional pad (DPad) buttons:
 
-The =example-graphics.bad.txt= is a file that lists the any images that the
-script could not decode as =png= files. Any such files are skipped.
+ #+BEGIN_EXAMPLE
+
+ $ tree
+ .
+ └── Dpad
+     ├── DownLeft.png
+     ├── Down.png
+     ├── DownRight.png
+     ├── Left.png
+     ├── Right.png
+     ├── UpLeft.png
+     ├── UP.png
+     └── UpRight.png
+
+
+ #+END_EXAMPLE
+
+ To create a single image that contains all of them, just do:
+
+ #+BEGIN_EXAMPLE
+
+ $ imbricate Dpad/ dpad
+
+ Reading images from disk........
+ Creating Layout........
+ Constructing tilesheet........
+ Writing to disk...
+ ALL DONE
+
+ #+END_EXAMPLE
+
+ Now your working directory shoul look like:
+
+ #+BEGIN_EXAMPLE
+
+ $ tree 
+ .
+ ├── Dpad
+ │   ├── DownLeft.png
+ │   ├── Down.png
+ │   ├── DownRight.png
+ │   ├── Left.png
+ │   ├── Right.png
+ │   ├── UpLeft.png
+ │   ├── UP.png
+ │   └── UpRight.png
+ ├── dpad.bad.txt
+ ├── dpad-index.lisp
+ └── dpad.png
+
+
+ #+END_EXAMPLE
+
+*** The Output
+
+ The file =dpad.bad.txt= is hopefully empty. It contains information
+ about processing errors that =imbricate= may have encountered.
+
+ The file =dpad.png= is the resulting image - it should contain
+ everything from the target directory.
+
+ The file =dpad-index.lisp= is a list of plists. For the above
+ example, it looks like this:
+
+#+BEGIN_EXAMPLE
+
+$ cat dpad-index.lisp 
+
+((:|name| "Dpad.Down" :|x| 54 :|y| 108 :|width| 54 :|height| 54)
+ (:|name| "Dpad.DownLeft" :|x| 0 :|y| 162 :|width| 54 :|height| 54)
+ (:|name| "Dpad.DownRight" :|x| 54 :|y| 54 :|width| 54 :|height| 54)
+ (:|name| "Dpad.Left" :|x| 108 :|y| 0 :|width| 54 :|height| 54)
+ (:|name| "Dpad.Right" :|x| 0 :|y| 108 :|width| 54 :|height| 54)
+ (:|name| "Dpad.UP" :|x| 54 :|y| 0 :|width| 54 :|height| 54)
+ (:|name| "Dpad.UpLeft" :|x| 0 :|y| 54 :|width| 54 :|height| 54)
+ (:|name| "Dpad.UpRight" :|x| 0 :|y| 0 :|width| 54 :|height| 54)) 
+
+#+END_EXAMPLE
+
+*** JSON Output
+
+You can opt for JSON output instead of Lisp by passing the =-json=
+option to =imbricate= after all the other arguments:
+
+#+BEGIN_EXAMPLE
+
+$ imbricate Dpad dpad -json
+
+$ cat dpad-index.json
+
+
+$ cat dpad-index.json   # this is after M-x json-pretty-print-buffer in emacs
+
+[
+  {
+    "name": "Dpad.Down",
+    "x": 54,
+    "y": 108,
+    "width": 54,
+    "height": 54
+  },
+  {
+    "name": "Dpad.DownLeft",
+    "x": 0,
+    "y": 162,
+    "width": 54,
+    "height": 54
+  },
+  {
+    "name": "Dpad.DownRight",
+    "x": 54,
+    "y": 54,
+    "width": 54,
+    "height": 54
+  },
+  {
+    "name": "Dpad.Left",
+    "x": 108,
+    "y": 0,
+    "width": 54,
+    "height": 54
+  },
+  {
+    "name": "Dpad.Right",
+    "x": 0,
+    "y": 108,
+    "width": 54,
+    "height": 54
+  },
+  {
+    "name": "Dpad.UP",
+    "x": 54,
+    "y": 0,
+    "width": 54,
+    "height": 54
+  },
+  {
+    "name": "Dpad.UpLeft",
+    "x": 0,
+    "y": 54,
+    "width": 54,
+    "height": 54
+  },
+  {
+    "name": "Dpad.UpRight",
+    "x": 0,
+    "y": 0,
+    "width": 54,
+    "height": 54
+  }
+]
+
+
+#+END_EXAMPLE
+
 
 ** Building
 
@@ -54,6 +179,17 @@ Assuming that you have [[https://github.com/roswell/roswell][roswell]] installed
 : $ cd imbricate.git
 : $ ros build imbricate.ros
 
+I copy the resulting executable to =~/.local/bin=, which is in my =PATH=.
+
+: $ cp imbricate ~/.local/bin
+
+
+** Caveats
+
+I made this for my own use, but relased it thinking it might be useful for others.  
+
+Presently, the tool only works with PNG files that have RGBA
+format. (i.e each pixel takes up 4 bytes).
 
 
 
