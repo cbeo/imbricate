@@ -105,9 +105,6 @@ option to =imbricate= after all the other arguments:
 
 $ imbricate Dpad dpad -json
 
-$ cat dpad-index.json
-
-
 $ cat dpad-index.json   # this is after M-x json-pretty-print-buffer in emacs
 
 [
