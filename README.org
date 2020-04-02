@@ -1,12 +1,15 @@
 
-* =imbricate= makes tilesheets for (Lisp) games
+* =imbricate= Makes Tilesheets For Games
 
-  The =imbricate= turns a directory, with possible nexted directories,
-  containing images of varying sizes into a single tile sheet. The tool also
-  produces file containing a list of property lists that includes a location and
-  a name for each image within the sheet.
+  The =imbricate= produces tile sheets from a directory tree the
+  leaves of which are PNG image files.  
 
-  The property list outputs either a list of plists, or a json file.
+  The PNG files can be of any size.  The =imbricate= tool will attempt
+  to pack the tiles into a square tile sheet.
+
+  Imbricate also produces an "index file" for the tilesheet, providing
+  a name and a location of each individual image.  The index can be in
+  Lisp or JSON formats.  
 
 ** Example
 
