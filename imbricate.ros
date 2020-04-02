@@ -73,7 +73,9 @@ exec ros -Q -- $0 "$@"
 	      (copy-into-img tilesheet img
 			     (getf spec :x)
 			     (getf spec :y))
-	    (error (e) (push (cons :bad-image-format (getf spec :path))
+	    (error (e) (push (list :bad-image-format
+				   (array-dimensions img)
+				   (getf spec :path))
 			     *bad-images*)))))
       tilesheet)))
 
@@ -90,14 +92,20 @@ exec ros -Q -- $0 "$@"
 
 
 (defun packlist->tile-index (packlist)
-  "renames the path1 in the packlist to a nicer name for referring toa tile location"
-  (mapcar #'(lambda (pl)
-	      (remf pl :img)
-	      (setf (getf pl :name)
-		    (substitute #\. #\/ (namestring  (getf pl :path))))
-	      (remf pl :path)
-	      pl)
-          packlist))
+  "renames the path in the packlist to a nicer name for referring toa tile location"
+  (let ((strip-index (1+  (length (sb-posix:getcwd)))))
+    (mapcar #'(lambda (pl)
+		(remf pl :img)
+		(setf (getf pl :name)
+		      (substitute #\. #\/ (subseq (namestring  (getf pl :path))
+						  strip-index)))
+		(setf (getf pl :name)
+		      (subseq (getf pl :name)
+			      0
+			      (search "." (getf pl :name) :from-end t)))
+		(remf pl :path)
+		pl)
+	    packlist)))
 
 (defun write-tile-index (tile-index file-path)
   "saves tile-index to file-path as a standard lisp object"
