@@ -5,7 +5,7 @@ exec ros -Q -- $0 "$@"
 |#
 (progn ;;init forms
   (ros:ensure-asdf)
-  #+quicklisp(ql:quickload '(cl-fad opticl) :silent t)
+  #+quicklisp(ql:quickload '(cl-fad opticl jonathan) :silent t)
   )
 
 (defpackage :ros.script.imbricate.3764151058
@@ -38,13 +38,13 @@ exec ros -Q -- $0 "$@"
       nil)))
 
 (defun image-stats (img)
-    (list :width (array-dimension img 0)
-          :height (array-dimension img 1)
+    (list :|width| (array-dimension img 0)
+          :|height| (array-dimension img 1)
           :img img))
 
 (defun image-area (stat)
-  (* (getf stat :width)
-     (getf stat :height)))
+  (* (getf stat :|width|)
+     (getf stat :|height|)))
 
 (defun minimum-required-area (image-list)
   (loop for stats in image-list
@@ -53,8 +53,8 @@ exec ros -Q -- $0 "$@"
 (defun packlist-dimensions (packlist)
   (let ((w 0) (h 0))
     (dolist (img packlist)
-      (setf w (max w (+ (getf img :width) (getf img :x))))
-      (setf h (max h (+ (getf img :height) (getf img :y)))))
+      (setf w (max w (+ (getf img :|width|) (getf img :|x|))))
+      (setf h (max h (+ (getf img :|height|) (getf img :|y|)))))
     (list w h)))
 
 (defun to-rgb (img)
@@ -71,8 +71,8 @@ exec ros -Q -- $0 "$@"
         (let* ((img (getf spec :img)))
 	  (handler-case 
 	      (copy-into-img tilesheet img
-			     (getf spec :x)
-			     (getf spec :y))
+			     (getf spec :|x|)
+			     (getf spec :|y|))
 	    (error (e) (push (list :bad-image-format
 				   (array-dimensions img)
 				   (getf spec :path))
@@ -96,21 +96,23 @@ exec ros -Q -- $0 "$@"
   (let ((strip-index (1+  (length (sb-posix:getcwd)))))
     (mapcar #'(lambda (pl)
 		(remf pl :img)
-		(setf (getf pl :name)
-		      (substitute #\. #\/ (subseq (namestring  (getf pl :path))
-						  strip-index)))
-		(setf (getf pl :name) 	; ← This is stupid hah ↓
-		      (subseq (getf pl :name)
-			      0
-			      (search "." (getf pl :name) :from-end t)))
+		(let ((name (substitute #\. #\/ (subseq (namestring  (getf pl :path))
+							strip-index))))
+		  (setf name (subseq name 0 (search "." name :from-end t)))
+		  (setf (getf pl :|name|) name))
 		(remf pl :path)
 		pl)
 	    packlist)))
 
 (defun write-tile-index (tile-index file-path)
   "saves tile-index to file-path as a standard lisp object"
-  (with-open-file (out file-path :direction :output)
+  (with-open-file (out file-path :direction :output :if-exists :supersede)
     (print tile-index out)))
+
+(defun write-json-index (tile-index file-path)
+  (with-open-file (out file-path :direction :output :if-exists :supersede)
+    (format out "~a"
+	    (jonathan:to-json tile-index))))
 
 (defun rect (x y w h) (list x y w h))
 (defun rx (r) (first r))
@@ -221,18 +223,18 @@ exec ros -Q -- $0 "$@"
         (ck (make-corner-keeper))
         (packlist '()))
     (dolist (stats tile-stats)
-      (let ((tw (getf stats :width))
-            (th (getf stats :height)))
+      (let ((tw (getf stats :|width|))
+            (th (getf stats :|height|)))
         (destructuring-bind (x y) (find-space-for ck tw th)
           (format t ".")
           (force-output)
           (add-rect ck (rect x y tw th))
-          (push (nconc (list :x x :y y) stats) packlist))))
+          (push (nconc (list :|x| x :|y| y) stats) packlist))))
     packlist))
 
 (defun main (&rest argv)
   (declare (ignorable argv))
-  (destructuring-bind (path target) argv
+  (destructuring-bind (path target . options) argv
       (let* ((tile-stats (images-under-dir path))
              (packlist (build-packlist tile-stats))
              (tilesheet (pack-images packlist))
@@ -240,7 +242,9 @@ exec ros -Q -- $0 "$@"
         (format t "~%Writing to disk...")
         (force-output)
         (opticl:write-png-file (format nil "~a.png" target) tilesheet)
-        (write-tile-index tile-index (format nil "~a-index.lisp" target))
+	(if (member "-json" options :test #'equal)
+	    (write-json-index tile-index (format nil "~a-index.json" target))
+	    (write-tile-index tile-index (format nil "~a-index.lisp" target)))
         (write-tile-index *bad-images* (format nil "~a.bad.txt" target))))
   (format t "~%ALL DONE~%"))
 ;;; vim: set ft=lisp lisp:
