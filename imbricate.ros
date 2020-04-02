@@ -5,7 +5,7 @@ exec ros -Q -- $0 "$@"
 |#
 (progn ;;init forms
   (ros:ensure-asdf)
-  #+quicklisp(ql:quickload '(imago cl-fad) :silent t)
+  #+quicklisp(ql:quickload '(cl-fad opticl) :silent t)
   )
 
 (defpackage :ros.script.imbricate.3764151058
@@ -32,14 +32,14 @@ exec ros -Q -- $0 "$@"
 (defvar *bad-images* '())
 
 (defun safe-open-image (path)
-  (handler-case (imago:read-png (format nil "~a" path))
+  (handler-case (opticl:read-png-file (format nil "~a" path))
     (error (c)
       (push path *bad-images*)
       nil)))
 
 (defun image-stats (img)
-    (list :width (imago:image-width img)
-          :height (imago:image-height img)
+    (list :width (array-dimension img 0)
+          :height (array-dimension img 1)
           :img img))
 
 (defun image-area (stat)
@@ -57,36 +57,46 @@ exec ros -Q -- $0 "$@"
       (setf h (max h (+ (getf img :height) (getf img :y)))))
     (list w h)))
 
-(defun rgb-imagep (img)
-  (eq (find-class 'imago:rgb-image)
-      (class-of img)))
-
 (defun to-rgb (img)
-  (if (not (rgb-imagep img))
-      (imago:convert-to-rgb img)
-      img))
+  img)
 
 (defun pack-images (packlist)
   "Creates an image and copies the contents of the packlist to that image"
   (format t "~%Constructing tilesheet")
   (destructuring-bind (cw ch) (packlist-dimensions packlist)
-    (let ((tilesheet (make-instance 'imago:rgb-image :width cw :height ch)))
+    (let ((tilesheet (make-array (list cw ch 4) :element-type '(unsigned-byte 8))))
       (dolist (spec packlist)
         (format t ".")
         (force-output)
-        (let* ((img (to-rgb (getf spec :img))))
-          (imago:copy tilesheet img
-                      :dest-x (getf spec :x)
-                      :dest-y (getf spec :y))))
+        (let* ((img (getf spec :img)))
+	  (handler-case 
+	      (copy-into-img tilesheet img
+			     (getf spec :x)
+			     (getf spec :y))
+	    (error (e) (push (cons :bad-image-format (getf spec :path))
+			     *bad-images*)))))
       tilesheet)))
+
+(defun img-width (img) (array-dimension img 0))
+(defun img-height (img) (array-dimension img 1))
+
+(defun copy-into-img (target source dest-x dest-y)
+  (dotimes (x (img-width source))
+    (dotimes (y (img-height source))
+      (dotimes (v 4)
+	(setf (aref target (+ x dest-x) (+ y dest-y) v)
+	      (aref source x y v))))))
+
+
 
 (defun packlist->tile-index (packlist)
   "renames the path1 in the packlist to a nicer name for referring toa tile location"
   (mapcar #'(lambda (pl)
-              (let ((name (pathname-name (getf pl :path))))
-                (remf pl :img)
-                (setf (getf pl :name) name)
-                pl))
+	      (remf pl :img)
+	      (setf (getf pl :name)
+		    (substitute #\. #\/ (namestring  (getf pl :path))))
+	      (remf pl :path)
+	      pl)
           packlist))
 
 (defun write-tile-index (tile-index file-path)
@@ -221,7 +231,7 @@ exec ros -Q -- $0 "$@"
              (tile-index (packlist->tile-index packlist)))
         (format t "~%Writing to disk...")
         (force-output)
-        (imago:write-png tilesheet (format nil "~a.png" target))
+        (opticl:write-png-file (format nil "~a.png" target) tilesheet)
         (write-tile-index tile-index (format nil "~a-index.lisp" target))
         (write-tile-index *bad-images* (format nil "~a.bad.txt" target))))
   (format t "~%ALL DONE~%"))
