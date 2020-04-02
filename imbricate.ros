@@ -99,7 +99,7 @@ exec ros -Q -- $0 "$@"
 		(setf (getf pl :name)
 		      (substitute #\. #\/ (subseq (namestring  (getf pl :path))
 						  strip-index)))
-		(setf (getf pl :name)
+		(setf (getf pl :name) 	; ← This is stupid hah ↓
 		      (subseq (getf pl :name)
 			      0
 			      (search "." (getf pl :name) :from-end t)))
