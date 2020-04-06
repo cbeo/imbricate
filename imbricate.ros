@@ -71,8 +71,8 @@ exec ros -Q -- $0 "$@"
         (let* ((img (getf spec :img)))
 	  (handler-case 
 	      (copy-into-img tilesheet img
-			     (getf spec :|x|)
-			     (getf spec :|y|))
+			     (getf spec :|y|)
+			     (getf spec :|x|))
 	    (error (e) (push (list :bad-image-format
 				   (array-dimensions img)
 				   (getf spec :path))
