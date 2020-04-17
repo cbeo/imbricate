@@ -175,7 +175,7 @@ $ cat dpad-index.json   # this is after M-x json-pretty-print-buffer in emacs
 Assuming that you have [[https://github.com/roswell/roswell][roswell]] installed:
 
 : $ ros use sbcl 
-: $ git clone https://github.com/thegoofist/imbricate.git 
+: $ git clone https://github.com/cbeo/imbricate.git 
 : $ cd imbricate.git
 : $ ros build imbricate.ros
 
