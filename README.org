@@ -186,7 +186,8 @@ I copy the resulting executable to =~/.local/bin=, which is in my =PATH=.
 
 ** Caveats
 
-I made this for my own use, but relased it thinking it might be useful for others.  
+I made this for my own use but released it thinking it might be useful
+for others.
 
 Presently, the tool only works with PNG files that have RGBA
 format. (i.e each pixel takes up 4 bytes).
