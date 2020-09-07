@@ -1,10 +1,10 @@
 ;;;; imbricate.asd
 
 (asdf:defsystem #:imbricate
-  :description "Describe imbricate here"
-  :author "Your Name <your.name@example.com>"
-  :license  "Specify license here"
-  :version "0.0.1"
+  :description "Makes tilesheets"
+  :author "colin okay <cbeok@protonmail.com>"
+  :license  "AGPL-3.0"
+  :version "0.1.0"
   :serial t
-  :depends-on (#:jonathan #:opticl #:uiop #:defclass-std #:lambda-tools)
+  :depends-on ( #:opticl #:uiop )
   :components ((:file "imbricate")))
