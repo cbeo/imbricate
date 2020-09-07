@@ -6,8 +6,8 @@
                 #:convert-image-to-rgba
                 #:read-png-file
                 #:with-image-bounds)
-  (:import-from #:alexandria #:when-let #:if-let)
-  (:import-from #:defclass-std #:defclass/std))
+  (:export #:imbricate
+           #:imbricate-and-save))
 
 (in-package #:imbricate)
 
@@ -91,6 +91,10 @@
     (format stream "#<tile: ~a~%    dimensions: ~ax~a~%    at: ~a,~a>"
             path width height x y)))
 
+(defun tile-meta-info (tile)
+  (with-slots (x y width height path) tile
+    (list :path path :x x :y y :width width :height height)))
+
 (defclass sheet-plan (rect)
   ((candidates :accessor candidates
                :initform nil)
@@ -158,6 +162,8 @@ instance. "
     sheet))
 
 
+(defun make-sheet-info (plan)
+  (mapcar #'tile-meta-info (positioned plan)))
 
 (defun load-tile (path)
   (let ((data
@@ -178,8 +184,7 @@ instance. "
 (defvar *bad-images* nil)
 
 (defun images-under-dir (dir)
-  (let ((images '())
-        (*bad-images* nil))
+  (let ((images '()))
     (uiop:collect-sub*directories
      dir
      (constantly t)
@@ -194,3 +199,27 @@ instance. "
                (push file *bad-images*)))))))
     images))
 
+
+(defun imbricate (dir)
+  (let ((*bad-images* nil)
+        (plan (position-tiles
+               (images-under-dir dir))))
+    (values 
+
+     (render-sheet plan)
+
+     (make-sheet-info plan)
+
+     *bad-images*)))
+
+(defun imbricate-and-save (dir save-to title)
+  (multiple-value-bind (sheet info bad) (imbricate dir)
+    (let ((png-path (merge-pathnames (format nil "~a.png" title) save-to))
+          (info-path (merge-pathnames (format nil "~a.sexp" title) save-to))
+          (bad-path (merge-pathnames (format nil "~a.errors.txt" title) save-to)))
+      (ensure-directories-exist png-path)
+      (with-open-file (out info-path :direction :output :if-exists :supersede)
+        (print info out))
+      (with-open-file (out bad-path :direction :output :if-exists :supersede)
+        (print bad out))
+      (opticl:write-png-file png-path sheet))))
