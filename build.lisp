@@ -13,6 +13,8 @@
   (format t "       SHEET-TITLE a name used for this sheet and its meta info~%~%"))
 
 
+
+
 #+sbcl
 (progn 
   (defun main ()
@@ -23,5 +25,5 @@
       (imbricate:imbricate-and-save src target title)
       (uiop:quit)))
 
-  (sb-ext:save-lisp-and-die #p"imbricate" :toplevel #'main :executable t))
+  (sb-ext:save-lisp-and-die #p"imbricate" :toplevel #'main :executable t :compression t))
 
