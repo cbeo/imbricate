@@ -1,29 +1,21 @@
 
-(ql:quickload :imbricate)
 
-(defpackage #:imbricate.run
-  (:use #:cl))
+(ql:register-local-projects)
 
-(in-package :imbricate.run)
+(dolist (dir ql:*local-project-directories*)
+  (push dir asdf:*central-registry*))
 
-(defun print-help ()
-  (format t "USAGE: imbricate SOURCE-DIR TARGET-DIR SHEET-TITLE~%~%")
-  (format t "       SOURCE-DIR a directory containing png files. Non png files are skipped~%")
-  (format t "       TARGET-DIR a directory where the tilesheet is to be built.~%")
-  (format t "       SHEET-TITLE a name used for this sheet and its meta info~%~%"))
-
-
-
+(ql:quickload :imbricate-run)
 
 #+sbcl
-(progn 
-  (defun main ()
-    (unless (= 4 (length sb-ext:*posix-argv*))
-      (print-help)
-      (uiop:quit))
-    (destructuring-bind (src target title) (cdr sb-ext:*posix-argv*)
-      (imbricate:imbricate-and-save src target title)
-      (uiop:quit)))
+(progn
+  (sb-ext:save-lisp-and-die #p"imbricate" :toplevel #'imbricate.run:main :executable t :compression t))
 
-  (sb-ext:save-lisp-and-die #p"imbricate" :toplevel #'main :executable t :compression t))
+#+ecl
+(progn 
+  (asdf:make-build :imbricate-run
+                   :type :program
+                   :move-here #P"./"
+                   :epilogue-code '(imbricate.run:main))
+  (ext:exit))
 
