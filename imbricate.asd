@@ -6,5 +6,5 @@
   :license  "AGPL-3.0"
   :version "0.1.0"
   :serial t
-  :depends-on ( #:opticl #:uiop )
+  :depends-on (#:asdf #:uiop #:opticl)
   :components ((:file "imbricate")))
