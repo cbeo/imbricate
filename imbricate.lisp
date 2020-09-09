@@ -26,7 +26,7 @@
            :type fixnum)))
 
 
-(defun rect-area (r)
+(defun area (r)
   (* (rect-width r) (rect-height r)))
 
 (defun contains-point-p (r px py)
@@ -58,10 +58,9 @@
   (cons (+ dx (car pt))
         (+ dy (cdr pt))))
 
-(defun left-most (rect) (rect-x rect))
+
 (defun right-most (rect) (1- (+ (rect-x rect) (rect-width rect))))
 (defun bottom-most (rect) (1- (+ (rect-y rect) (rect-height rect))))
-(defun top-most (rect ) (rect-y rect))
 
 (defun corners (rect)
   (list (top-left rect)
@@ -99,19 +98,25 @@
 
 
 (defun validly-positioned-p (plan tile)
+  "A tile has a valid position if the plan rectangle contains the tile
+rectangle, and if the tile does not intersect any other tile already
+positioned."
   (and (contains-point-p plan (right-most tile) (bottom-most tile))
        (not (some (lambda (other) (intersects-p tile other)) (positioned plan)))))
 
 (defun position-tile (plan tile)
-  "finds a place for the tile in the tilesheet under construction and
-places the tile into the 'positioned' list of the corner plan
-instance. "
+  "Places the tile into the plan, increasing the dimensions of the
+plan when necessary, and updates the plan's internal state to account
+for the new tile. 
+
+Modifies both the tile and the plan."
+  ;; 1. search for a condidate position 
   (loop :for (x . y) :in (candidates plan)
         :do (setf (rect-x tile) x
                   (rect-y tile) y)
         :until (validly-positioned-p plan tile))
-  ;; if no position was found, set a position based
-  ;; on the current size of the tilesheet
+  ;; 2. If no position was found, set a position based
+  ;; on the current size of the plan rectangle
   (unless (validly-positioned-p plan tile)
     (with-slots (width height) plan
       (if (< width height)
@@ -119,14 +124,12 @@ instance. "
                 (rect-y tile) 0)
           (setf (rect-x tile) 0
                 (rect-y tile) height))))
-
-  ;; update width and height of the sheet
+  ;; 3. update width and height of the plan
   (setf (rect-width plan) (max (rect-width plan)
                                  (1+  (right-most tile)))
         (rect-height plan) (max (rect-height plan)
                                   (1+ (bottom-most tile))))
-
-  ;; update the corner plan
+  ;; 4. update candidate corners
   (push tile (positioned plan))       
   (setf (candidates plan)
         (delete (top-left tile)
@@ -140,25 +143,28 @@ instance. "
 
 
 (defun position-tiles (tiles)
+  "Accepts a list of tiles and returns a plan that arranges them in to
+a compact logical 2d plane"
   (let ((plan (make-instance 'sheet-plan))
-        (tiles (sort tiles #'> :key #'rect-area)))
+        (tiles (sort tiles #'> :key #'area)))
     (dolist (tile tiles plan)
       (position-tile plan tile))))
 
 
 
 (defun render-sheet (plan)
+  "Generates and returns a single image from a plan."
   (let ((sheet (opticl:make-8-bit-rgba-image (rect-width plan) (rect-height plan))))
-    (dolist (tile (positioned plan))
+    (dolist (tile (positioned plan) sheet)
       (with-slots (x y width height data) tile 
         (dotimes (px width)
           (dotimes (py height)
             (setf (opticl:pixel sheet  (+ x px) (+ y py) )
-                  (opticl:pixel data  px py ))))))
-    sheet))
+                  (opticl:pixel data  px py ))))))))
 
 
 (defun make-sheet-info (plan)
+  "Return a list of plists, each describing metadata for one tile."
   (mapcar #'tile-meta-info (positioned plan)))
 
 (defun load-tile (path)
@@ -180,6 +186,7 @@ instance. "
 (defvar *bad-images* nil)
 
 (defun images-under-dir (dir)
+  "Returns a list of TILE instances for images in the directory tree rooted at DIR."
   (let ((images '()))
     (uiop:collect-sub*directories
      dir
@@ -197,15 +204,17 @@ instance. "
 
 
 (defun imbricate (dir)
+  "Given a directory, returns three values:
+
+1. An array representing representing a tilesheet for the images under DIR.
+2. A list of plists containing metainformation for the tiles in the tile sheet
+3. A list of paths of those images that could not be succesfully loaded."
   (let ((*bad-images* nil)
         (plan (position-tiles
                (images-under-dir dir))))
     (values 
-
      (render-sheet plan)
-
      (make-sheet-info plan)
-
      *bad-images*)))
 
 (defun imbricate-and-save (dir save-to title)
@@ -216,6 +225,7 @@ instance. "
       (ensure-directories-exist png-path)
       (with-open-file (out info-path :direction :output :if-exists :supersede)
         (print info out))
-      (with-open-file (out bad-path :direction :output :if-exists :supersede)
-        (print bad out))
+      (when bad 
+        (with-open-file (out bad-path :direction :output :if-exists :supersede)
+          (print bad out)))
       (opticl:write-png-file png-path sheet))))
