@@ -2,10 +2,6 @@
 
 (defpackage #:imbricate
   (:use #:cl)
-  (:import-from #:opticl
-                #:convert-image-to-rgba
-                #:read-png-file
-                #:with-image-bounds)
   (:export #:imbricate
            #:imbricate-and-save))
 
@@ -167,10 +163,10 @@ instance. "
 
 (defun load-tile (path)
   (let ((data
-          (convert-image-to-rgba
-           (read-png-file path))))
+          (opticl:convert-image-to-rgba
+           (opticl:read-png-file path))))
 
-    (with-image-bounds (w h) data
+    (opticl:with-image-bounds (w h) data
       (make-instance 'tile
                      :path path
                      :data data
